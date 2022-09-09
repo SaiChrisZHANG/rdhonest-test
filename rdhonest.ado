@@ -115,6 +115,11 @@ program Estimate, eclass byable(recall) sortpreserve
 		local `vargroup' `there'
 	}
 
+	// sort by cluster id for clustering
+	if (`cluster_ind') {
+		sort `cluster'
+	}
+
 	* input control =============================
 
 	/* specification errors */
@@ -201,7 +206,7 @@ program Estimate, eclass byable(recall) sortpreserve
 		if (`prevar_ind') sigma2 = st_data(.,("`pvariance'"));
 		if (!`prevar_ind') sigma2 = J(rows(Y),cols(Y)^2,.);
 		if (`cluster_ind') cluster = st_data(.,("`cluster'"));
-		if (!`cluster_ind') cluster = J(rows(Y),1,1);
+		if (!`cluster_ind') cluster = J(rows(Y),1,.);
 		if (`weight_ind') weight = st_data(.,("`weight'")); 
 		if (!`weight_ind') weight = J(rows(Y),1,1);
 
@@ -730,11 +735,12 @@ mata:
 	}
 
 	class LPRegOutput scalar LPReg (real matrix X, real matrix Y, real matrix sigma2, 
-									real matrix weight, real scalar h, string kernel,
-									real scalar order, string se_method, real scalar j) {
+									real matrix weight, real matrix cluster, real scalar h, 
+									string kernel, real scalar order, string se_method, 
+									real scalar j, real scalar rho) {
 
 		real scalar effObs
-		real matrix R, Gamma, beta, hsigma2, dsigma2, nsigma2, var
+		real matrix R, Gamma, beta, hsigma2, dsigma2, nsigma2, var, clu_setup, Vaug
 		/* weight: obs weights */ 
 		/* wt: OLS weights give theta */
 		/* W: kern weights plus obs weights */
@@ -769,45 +775,58 @@ mata:
 			output.m = m
 		}
 		else{
-		wgt = ((invsym(Gamma) * (w :* R)')[1,.])'
-		/* To compute effective observations, rescale against uniform kernel*/
-		/* use weight rather than kernel + weight */
-		wgt_unif = ((invsym(quadcross(R,weight:* R)) * (weight :* R)')[1,.])'
+			wgt = ((invsym(Gamma) * (w :* R)')[1,.])'
+			/* To compute effective observations, rescale against uniform kernel*/
+			/* use weight rather than kernel + weight */
+			wgt_unif = ((invsym(quadcross(R,weight:* R)) * (weight :* R)')[1,.])'
 
-		/* estimates from using OLS weights */
-		/* squared residuals allowing for Y being multi-variates */
-		beta = (invsym(Gamma) * (w :* R)' )* Y
-		hsigma2 = (Y - R*beta) 	
-		hsigma2=hsigma2[.,(J(1, cols(hsigma2), (1..cols(hsigma2))))]:*
-		hsigma2[.,( vec(J(cols(hsigma2),1, (1..cols(hsigma2))))')]
+			/* estimates from using OLS weights */
+			/* squared residuals allowing for Y being multi-variates */
+			beta = (invsym(Gamma) * (w :* R)' )* Y
+			hsigma2 = (Y - R*beta) 	
 
-		/* Robust variance-based formula */
-		// supplied_var: use use-supplied squared residuals to compute EHW variance 
-		if(strpos(se_method,"supplied_var") > 0) {
-			var = wgt:^2:*sigma2
-		}
+			/* Robust variance-based formula */
+			// supplied_var: use use-supplied squared residuals to compute EHW variance 
+			if(cluster[1]==.) {
+				if(strpos(se_method,"supplied_var") > 0) {
+					var = colsum(wgt:^2:*sigma2)
+				}
 
-		if(strpos(se_method,"EHW") > 0 | strpos(se_method,"ehw") > 0) {
-			var = wgt:^2:*hsigma2
-		}
+				if(strpos(se_method,"EHW") > 0 | strpos(se_method,"ehw") > 0) {
+					hsigma2=hsigma2[.,(J(1, cols(hsigma2), (1..cols(hsigma2))))]:*
+					hsigma2[.,( vec(J(cols(hsigma2),1, (1..cols(hsigma2))))')]
+					var = colsum(wgt:^2:*hsigma2)
+				}
 
-		if(strpos(se_method,"NN") > 0 | strpos(se_method,"nn") > 0 ) {
-			nsigma2 = sigmann(X,Y,j,weight)
-			var = wgt:^2:*nsigma2
-		}
+				if(strpos(se_method,"NN") > 0 | strpos(se_method,"nn") > 0 ) {
+					nsigma2 = sigmann(X,Y,j,weight)
+					var = colsum(wgt:^2:*nsigma2)
+				}
+			}
+			else {
+				clu_setup = panelsetup(cluster,1)
+				if(strpos(se_method,"supplied_var") > 0) {
+					var = colsum(wgt:^2:*sigma2) :+ rho*( sum(panelsum(wgt,clu_setup):^2) - sum(wgt:^2) )
+				}
+				
+				else {
+					Vaug = panelsum(wgt:*hsigma2, clu_setup)
+					var = vec( cross(Vaug,Vaug) )'
+				}
+			}
+			
+			/* catch error when no variance is provided */
+			if( max((var:==.)) ) _error("No variance was computed by LPReg")
 
-		/* catch error when no variance is provided */
-		if( max((var:==.)) ) _error("No variance was computed by LPReg")
-
-		/* return output */
-		output.theta = beta[1,.]
-		output.sigma2 = hsigma2
-		output.var = colsum(var)
-		output.w = w
-		output.eo = length(X)*sum(wgt_unif:^2)/sum(wgt:^2) 
-		output.wgt = wgt
-		output.p = p
-		output.m = m
+			/* return output */
+			output.theta = beta[1,.]
+			output.sigma2 = hsigma2
+			output.var = var
+			output.w = w
+			output.eo = length(X)*sum(wgt_unif:^2)/sum(wgt:^2) 
+			output.wgt = wgt
+			output.p = p
+			output.m = m
 		}
 		
 		//printf("var is %9.4f ",output.var)
@@ -840,7 +859,7 @@ mata:
 
 		/* variable declarations */
 		real scalar plugin /* to be implemented later */
-		real matrix Y, X, w, sigma2, Xm, Xp, weight
+		real matrix Y, X, w, sigma2, Xm, Xp, weight cluster
 		
 		class RDLPregOutput scalar output
 		class LPRegOutput scalar r1
@@ -852,6 +871,7 @@ mata:
 		kernel weights */
 		X = select(df.X,w :> 0) ; Y = select(df.Y,w :> 0)
 		sigma2 = select(df.sigma2,w :> 0) ; weight = select(df.weight,w :> 0) 
+		cluster = select(df.cluster, w:>0)
 
 		Xm = select(X,X :< 0) ; Xp = select(X,X :>= 0)
 		if ((length(Xm) < 3*order | length(Xp) < 3*order) & !no_warning) {
@@ -867,9 +887,8 @@ mata:
 			printf("{red}with positive weights, for the running variable. \n")
 		}
 
-
 		/* regression */
-		r1 = LPReg(X, Y, sigma2, weight, h, kernel, order, se_method, j)
+		r1 = LPReg(X, Y, sigma2, weight, cluster, h, kernel, order, se_method, j, rho)
 	  
 		/* output */
 		output.estimate = r1.theta[1]
