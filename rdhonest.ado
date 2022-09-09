@@ -731,16 +731,18 @@ mata:
 		real scalar eo /* effective observations */
 		real vector p , m /* below and above indicator */
 
-		real matrix wgt  /* OLS weight on Y_i that gives theta */				  
+		real matrix wgt  /* OLS weight on Y_i that gives theta */
+
+		real matrix res /* residuals */				  
 	}
 
 	class LPRegOutput scalar LPReg (real matrix X, real matrix Y, real matrix sigma2, 
 									real matrix weight, real matrix cluster, real scalar h, 
 									string kernel, real scalar order, string se_method, 
-									real scalar j, real scalar rho) {
+									real scalar j, real vector rho) {
 
 		real scalar effObs
-		real matrix R, Gamma, beta, hsigma2, dsigma2, nsigma2, var, clu_setup, Vaug
+		real matrix R, Gamma, beta, res, hsigma2, dsigma2, nsigma2, var, clu_setup, Vaug
 		/* weight: obs weights */ 
 		/* wt: OLS weights give theta */
 		/* W: kern weights plus obs weights */
@@ -783,18 +785,18 @@ mata:
 			/* estimates from using OLS weights */
 			/* squared residuals allowing for Y being multi-variates */
 			beta = (invsym(Gamma) * (w :* R)' )* Y
-			hsigma2 = (Y - R*beta) 	
+			res = (Y - R*beta) 	
 
 			/* Robust variance-based formula */
 			// supplied_var: use use-supplied squared residuals to compute EHW variance 
-			if(cluster[1]==.) {
+			if ( max((df.cluster:==.)) ) {
 				if(strpos(se_method,"supplied_var") > 0) {
 					var = colsum(wgt:^2:*sigma2)
 				}
 
 				if(strpos(se_method,"EHW") > 0 | strpos(se_method,"ehw") > 0) {
-					hsigma2=hsigma2[.,(J(1, cols(hsigma2), (1..cols(hsigma2))))]:*
-					hsigma2[.,( vec(J(cols(hsigma2),1, (1..cols(hsigma2))))')]
+					hsigma2=res[.,(J(1, cols(res), (1..cols(res))))]:*
+					res[.,( vec(J(cols(res),1, (1..cols(res))))')]
 					var = colsum(wgt:^2:*hsigma2)
 				}
 
@@ -810,7 +812,7 @@ mata:
 				}
 				
 				else {
-					Vaug = panelsum(wgt:*hsigma2, clu_setup)
+					Vaug = panelsum(wgt:*res, clu_setup)
 					var = vec( cross(Vaug,Vaug) )'
 				}
 			}
@@ -825,6 +827,7 @@ mata:
 			output.w = w
 			output.eo = length(X)*sum(wgt_unif:^2)/sum(wgt:^2) 
 			output.wgt = wgt
+			output.res = res
 			output.p = p
 			output.m = m
 		}
@@ -845,7 +848,7 @@ mata:
 
 	class RDLPregOutput scalar RDLPreg(class RDData scalar df, real scalar h,
 		| string kernel, real scalar order, string se_method,
-			real scalar no_warning, real scalar j) {
+			real scalar no_warning, real scalar j, real vector rho) {
 
 		/* check for errors */
 		if (h <= 0) _error("Non-positive bandwidth h")
@@ -871,7 +874,7 @@ mata:
 		kernel weights */
 		X = select(df.X,w :> 0) ; Y = select(df.Y,w :> 0)
 		sigma2 = select(df.sigma2,w :> 0) ; weight = select(df.weight,w :> 0) 
-		cluster = select(df.cluster, w:>0)
+		cluster = select(df.cluster,w :> 0)
 
 		Xm = select(X,X :< 0) ; Xp = select(X,X :>= 0)
 		if ((length(Xm) < 3*order | length(Xp) < 3*order) & !no_warning) {
@@ -902,6 +905,7 @@ mata:
 		output.m = r1.m
 		output.var = r1.var
 		output.wgt = r1.wgt
+		output.res = r1.res
 		
 		if (df.rdclass == "frd") {	
 			output.fs = r1.theta[2]
@@ -914,6 +918,27 @@ mata:
 		return(output)
 		
 	}
+
+	// 3.3 Moulton estimate of rho for clustering ==============
+	real vector Moulton(real matrix res, real matrix clu_setup) {
+
+		real scalar den
+		real matrix res_aug
+		real vector moul
+
+		den = sum( panelsum(J(rows(res),1,1),clu_setup):^2 ) - rows(res)
+		
+		if (den > 0){
+			res_aug = panelsum(res,clu_setup)
+			moul = vec(cross(res_aug,res_aug)-cross(res,res)):/den
+		}
+		else{
+			moul = J(cols(res)^2,1,0)
+		}
+
+		return (moul)
+	}
+
 
 	// 4. Rule of thumb choosing M =============================
 
@@ -1078,7 +1103,7 @@ mata:
 
 	class RDData scalar RDPrelimVar(class RDData scalar df, real matrix kernC,| string se_initial) {
 		
-		real matrix X, Xp, Xm
+		real matrix X, Xp, Xm, rho
 		class RDLPregOutput scalar r1
 		real scalar h1, hmin, lm, lp, varm, varp 
 		class RDData scalar drf 
@@ -1201,8 +1226,6 @@ mata:
 		}
 		return(h)
 	}
-
-
 
 	// 7. main function: RDHonest_fit===========================
 
