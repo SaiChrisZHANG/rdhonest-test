@@ -203,6 +203,7 @@ program Estimate, eclass byable(recall) sortpreserve
 
 		rdclass = (`sRD'>0 ? "srd":"frd")
 		
+		printf("\n impute missing \n")
 		if (`prevar_ind') sigma2 = st_data(.,("`pvariance'"));
 		if (!`prevar_ind') sigma2 = J(rows(Y),cols(Y)^2,.);
 		if (`cluster_ind') cluster = st_data(.,("`cluster'"));
