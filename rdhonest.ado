@@ -1389,11 +1389,15 @@ mata:
 		if(max(opt.m) < 0) {
 		printf("Using Armstrong and Kolesar (2020) rule of thumb for smoothness constant M \n")
 		opt.m = MROT_fit(df.X,df.Y)	
-		}    
+		}
+		
 		printf("check2" \n)
+
 		/* optimal bandwidth */
 		results =  NPRDHonest_fit(df, opt,kernC, 0)
+
 		printf("check3"\n)
+
 		/*** numerical scalars ***/ 
 		st_numscalar("estimate",results.estimate)
 		st_numscalar("bias",results.bias)
