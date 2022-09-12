@@ -218,7 +218,7 @@ program Estimate, eclass byable(recall) sortpreserve
 		sigma2 = select(sigma2,sample:==1)
 		cluster = select(cluster,sample:==1)
 		weight = select(weight,sample:==1)
-	  
+	  	prinf("\n data prep start \n")
 		// initialize data frame and map Y and X in
 		df = RDDataPrep(id,X,Y,`c',sigma2,weight,cluster,rdclass)
 		printf("\n data prep done \n")
