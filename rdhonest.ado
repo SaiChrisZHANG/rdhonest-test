@@ -39,7 +39,6 @@ program Estimate, eclass byable(recall) sortpreserve
 	version 14
 
 	* parsing ===================================
-	di "start parsing"
 	rdparse `0'
 	
 	local depvar `s(depvar)'
@@ -194,6 +193,7 @@ program Estimate, eclass byable(recall) sortpreserve
 	* start mata
 	set matastrict on
 	mata{
+		mata set matalnum on
 		if (`fRD') Y = st_data(.,("`depvar'","`treat'"));
 		if (`sRD') Y = st_data(.,("`depvar'"));
 		X = st_data(.,("`runvar'"))	
