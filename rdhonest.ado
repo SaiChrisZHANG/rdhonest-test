@@ -649,8 +649,8 @@ mata:
 		/* supplied weights */ 
 		if(length(cluster)!=length(X)) _error("length of supplied cluster ID does not match data")
 		  
-		/* sort data */
-		s = sort((this.X, this.m, this.p, this.weight, this.cluster, this.Y, this.sigma2, this.ID),1)
+		/* sort data: by cluster id and X */
+		s = sort((this.X, this.m, this.p, this.weight, this.cluster, this.Y, this.sigma2, this.ID),(5,1))
 		this.X = s[.,1];  this.m = s[.,2]; this.p = s[.,3]
 		this.weight= s[.,4] ;  this.cluster = s[.,5] 
 		this.Y = s[.,(6..(cols(Y)+5))] ; this.sigma2 = s[.,((cols(Y)+6)..(cols(sigma2)+cols(Y)+5))];
@@ -848,7 +848,7 @@ mata:
 
 	class RDLPregOutput scalar RDLPreg(class RDData scalar df, real scalar h,
 		| string kernel, real scalar order, string se_method,
-			real scalar no_warning, real scalar j, real vector rho) {
+			real scalar no_warning, real scalar j) {
 
 		/* check for errors */
 		if (h <= 0) _error("Non-positive bandwidth h")
@@ -863,6 +863,7 @@ mata:
 		/* variable declarations */
 		real scalar plugin /* to be implemented later */
 		real matrix Y, X, w, sigma2, Xm, Xp, weight cluster
+		real vector rho
 		
 		class RDLPregOutput scalar output
 		class LPRegOutput scalar r1
@@ -917,26 +918,6 @@ mata:
 
 		return(output)
 		
-	}
-
-	// 3.3 Moulton estimate of rho for clustering ==============
-	real vector Moulton(real matrix res, real matrix clu_setup) {
-
-		real scalar den
-		real matrix res_aug
-		real vector moul
-
-		den = sum( panelsum(J(rows(res),1,1),clu_setup):^2 ) - rows(res)
-		
-		if (den > 0){
-			res_aug = panelsum(res,clu_setup)
-			moul = vec(cross(res_aug,res_aug)-cross(res,res)):/den
-		}
-		else{
-			moul = J(cols(res)^2,1,0)
-		}
-
-		return (moul)
 	}
 
 
@@ -1101,15 +1082,12 @@ mata:
 		return(cons * ((varp + varm)/(f0 * N * ((m2p - m2m)^2 + rm + rp)))^(1/5))
 	}
 
-	class RDData scalar RDPrelimVar(class RDData scalar df, real matrix kernC,| string se_initial) {
+	class RDLPregOutput scalar RDPrelimEst(class RDData scalar df, real matrix kernC, string se_initial) {
 		
-		real matrix X, Xp, Xm, rho
+		real matrix X, Xp, Xm
 		class RDLPregOutput scalar r1
-		real scalar h1, hmin, lm, lp, varm, varp 
+		real scalar h1, hmin 
 		class RDData scalar drf 
-		
-		/* set defaults: EHW and IK bandwidth*/
-		if(args()==2) se_initial = "IKEHW"
 
 		/* concatenate Xm and Xp and compute "rule of thumb" bandwidth */
 		X = df.X
@@ -1130,15 +1108,6 @@ mata:
 		if (strpos(se_initial,"Silverman") > 0) {	
 			if (cols(df.Y) == 1) {
 				r1 = RDLPreg(df,h1,"uni",0,"EHW")
-				
-				/* variance adjustment on either side */
-				lp = sum(r1.p)
-				lm = sum(r1.m)
-				
-				varp = sum(r1.sigma2:*r1.p)*1/(lp-1)
-				varm = sum(r1.sigma2:*r1.m)*1/(lm-1)
-				
-				df.sigma2 = (df.X:<0):*varm + (df.X:>=0):*varp
 			} 
 			else {	
 				_error("This method for preliminary variance estimation is not supported.")
@@ -1147,7 +1116,43 @@ mata:
 		else if (strpos(se_initial,"IKEHW") > 0) {
 			h1 = IKBW_fit(drf, kernC)	
 			r1 = RDLPreg(df,max((h1,hmin)),"tri",1,"EHW")
-			
+		}
+		else {
+			_error("Unknown method for estimating initial variance.")
+		}
+
+		return(r1)
+	}
+
+	class RDData scalar RDPrelimVar(class RDData scalar df, real matrix kernC,| string se_initial) {
+		
+		real matrix X, Xp, Xm
+		real scalar lm, lp, varm, varp
+		class RDLPregOutput scalar r1
+		
+		/* set defaults: EHW and IK bandwidth*/
+		if(args()==2) se_initial = "IKEHW"
+
+		/* concatenate Xm and Xp and compute "rule of thumb" bandwidth */
+		X = df.X
+		
+		Xp = select(df.X,df.X:>=0) ; Xm = select(df.X,df.X:<0)
+
+		r1 = RDPrelimEst(df, kernC, se_initial)
+					 
+		if (strpos(se_initial,"Silverman") > 0) {	
+			if (cols(df.Y) == 1) {
+				/* variance adjustment on either side */
+				lp = sum(r1.p)
+				lm = sum(r1.m)
+				
+				varp = sum(r1.sigma2:*r1.p)*1/(lp-1)
+				varm = sum(r1.sigma2:*r1.m)*1/(lm-1)
+				
+				df.sigma2 = (df.X:<0):*varm + (df.X:>=0):*varp
+			}
+		}
+		else if (strpos(se_initial,"IKEHW") > 0) {
 			lp = sum(r1.p)
 			lm = sum(r1.m)
 			
@@ -1156,11 +1161,41 @@ mata:
 
 			df.sigma2 = (df.X:<0):*J(rows(df.X),1,varm) + (df.X:>=0):*J(rows(df.X),1,varp)	
 		}
-		else {
-			_error("Unknown method for estimating initial variance.")
-		}
 
 		return(df)
+	}
+
+	// 5.1 Moulton estimate of rho for clustering ==============
+	real vector moulton_est(real matrix res, real matrix clu_setup) {
+
+		real scalar den
+		real matrix res_aug
+		real vector moul
+
+		den = sum( panelsum(J(rows(res),1,1),clu_setup):^2 ) - rows(res)
+		
+		if (den > 0){
+			res_aug = panelsum(res,clu_setup)
+			moul = vec(cross(res_aug,res_aug)-cross(res,res)):/den
+		}
+		else{
+			moul = J(cols(res)^2,1,0)
+		}
+
+		return (moul)
+	}
+
+	real vector Moulton(class RDData scalar df, real matrix kernC){
+		class RDLPregOutput scalar r1
+		real matrix clu_setup
+		real vector moul
+
+		r1 = RDPrelimEst(df, KernC, "IKEHW")
+		clu_setup = panelsetup( select(df.cluster,(r1.res[,1]:!=.)), 1)
+		
+		moul = moulton_est(select(r1.res,(r1.res[,1]:!=.)), clu_setup)
+
+		return(moul)
 	}
 
 	// 6. compute optimal h=====================================
@@ -1242,7 +1277,7 @@ mata:
 
 		class RDLPregOutput scalar r1
 		real scalar h, z
-		real vector wp, wm, M
+		real vector wp, wm, M, rho
 		real matrix XX, XXp, XXm 
 		struct RDResults scalar results
 
@@ -1252,10 +1287,19 @@ mata:
 			//printf("Bandwidth (h) missing or invalid, running RDOptBW_fit \n")
 			h = RDOptBW_fit(df, opt, kernC)
 		}
-			
-		/* run RD local polinomial regression */
-		r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j)
-		// Suppress warnings about too few observations 
+
+		if ( max((df.cluster:!=.)) ) {
+			rho = Moulton(df, kernC)
+			/* run RD local polinomial regression */
+			// Suppress warnings about too few observations 
+			r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
+		}
+		else {
+			/* run RD local polinomial regression */
+			// Suppress warnings about too few observations 
+			r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
+		}
+		
 		wp = select(r1.wgt,r1.p:==1)
 		wm = select(r1.wgt,r1.m:==1)
 		XX = select(df.X,r1.kw:>0)
