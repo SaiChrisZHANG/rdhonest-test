@@ -1098,6 +1098,7 @@ mata:
 		
 		real matrix X, Xp, Xm
 		class RDLPregOutput scalar r1
+		class RDPrelimVarOutput scalar output
 		real scalar h1, hmin 
 		class RDData scalar drf 
 
