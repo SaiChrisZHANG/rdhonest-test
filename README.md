@@ -70,13 +70,13 @@ To install the package
 * Remove program if it existed previously
 capture ado uninstall rdhonest
 * Install most up-to-date version
-net install rdhonest, from("https://raw.githubusercontent.com/tbarmstr/RDHonest-vStata/master/")
+net install rdhonest, from("https://raw.githubusercontent.com/SaiChrisZHANG/rdhonest-test/master/")
 ```
 
 To intall [`rcp.dta`](data/rcp.dta) for testing purposes at the same time, use
 
 ```stata
-net install rdhonest, all from("https://raw.githubusercontent.com/tbarmstr/RDHonest-vStata/master/")
+net install rdhonest, all from("https://raw.githubusercontent.com/SaiChrisZHANG/rdhonest-test/master/")
 ```
 
 the data set will be installed in the **current working directory**. One can use
