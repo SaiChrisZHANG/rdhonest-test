@@ -221,6 +221,7 @@ program Estimate, eclass byable(recall) sortpreserve
 	  
 		// initialize data frame and map Y and X in
 		df = RDDataPrep(id,X,Y,`c',sigma2,weight,cluster,rdclass)
+		printf("\n data prep done \n")
 
 		// initialize options
 		m=(`=subinstr("`m'"," ",",",.)')
@@ -249,6 +250,8 @@ program Estimate, eclass byable(recall) sortpreserve
 							order, ///
 							t0,
 							nolog)  
+
+		printf("\n option prep done \n")
 
 		// return
 		ret = RDResults()
@@ -1307,6 +1310,7 @@ mata:
 			h = RDOptBW_fit(df, opt, kernC)
 		}
 
+		printf("\n NPRDHonest_fit rho calculating \n")
 		if ( max((df.cluster:!=.)) ) {
 			rho = Moulton(df, kernC)
 		}
@@ -1314,11 +1318,15 @@ mata:
 			rho = J(cols(res)^2,1,0)
 			
 		}
+		printf("\n NPRDHonest_fit rho calculated \n")
 
 		/* run RD local polinomial regression */
 		// Suppress warnings about too few observations 
+
+		printf("\n NPRDHonest_fit running RDLPreg \n")
 		r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
-	
+		printf("\n NPRDHonest_fit RDLPreg done \n")
+
 		wp = select(r1.wgt,r1.p:==1)
 		wm = select(r1.wgt,r1.m:==1)
 		XX = select(df.X,r1.kw:>0)
@@ -1375,7 +1383,7 @@ mata:
 		class RDLPregOutput scalar regoutput 
 		real matrix kw, wgt, tempID, Sample, est_w
 		
-		printf("check1"\n)
+		printf("\n check1 \n")
 
 		/* initial se estimate */
 		if ( max((df.sigma2:==.))
@@ -1391,12 +1399,12 @@ mata:
 		opt.m = MROT_fit(df.X,df.Y)	
 		}
 		
-		printf("check2" \n)
+		printf("\n check2 \n")
 
 		/* optimal bandwidth */
 		results =  NPRDHonest_fit(df, opt,kernC, 0)
 
-		printf("check3"\n)
+		printf("\n check3 \n")
 
 		/*** numerical scalars ***/ 
 		st_numscalar("estimate",results.estimate)
