@@ -39,6 +39,7 @@ program Estimate, eclass byable(recall) sortpreserve
 	version 14
 
 	* parsing ===================================
+	di "start parsing"
 	rdparse `0'
 	
 	local depvar `s(depvar)'
