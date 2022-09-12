@@ -1087,7 +1087,14 @@ mata:
 		return(cons * ((varp + varm)/(f0 * N * ((m2p - m2m)^2 + rm + rp)))^(1/5))
 	}
 
-	class RDLPregOutput scalar RDPrelimEst(class RDData scalar df, real matrix kernC, string se_initial) {
+	// 5.1 build preliminary variance estimation
+
+	class RDPrelimVarOutput{
+		real vector p , m /* below and above indicator */
+		real matrix res /* residuals */
+	}
+
+	class RDPrelimVarOutput scalar RDPrelimEst(class RDData scalar df, real matrix kernC, string se_initial) {
 		
 		real matrix X, Xp, Xm
 		class RDLPregOutput scalar r1
@@ -1126,14 +1133,19 @@ mata:
 			_error("Unknown method for estimating initial variance.")
 		}
 
-		return(r1)
+		/* output */
+		output.p = r1.p
+		output.m = r1.m
+		output.res = r1.res
+
+		return(output)
 	}
 
 	class RDData scalar RDPrelimVar(class RDData scalar df, real matrix kernC,| string se_initial) {
 		
 		real matrix X, Xp, Xm
 		real scalar lm, lp, varm, varp
-		class RDLPregOutput scalar r1
+		class RDPrelimVarOutput scalar r1
 		
 		/* set defaults: EHW and IK bandwidth*/
 		if(args()==2) se_initial = "IKEHW"
@@ -1170,7 +1182,7 @@ mata:
 		return(df)
 	}
 
-	// 5.1 Moulton estimate of rho for clustering ==============
+	// 5.2 Moulton estimate of rho for clustering ==============
 	real vector moulton_est(real matrix res, real matrix clu_setup) {
 
 		real scalar den
@@ -1191,7 +1203,7 @@ mata:
 	}
 
 	real vector Moulton(class RDData scalar df, real matrix kernC){
-		class RDLPregOutput scalar r1
+		class RDPrelimVarOutput scalar r1
 		real matrix clu_setup
 		real vector moul
 
@@ -1296,17 +1308,16 @@ mata:
 
 		if ( max((df.cluster:!=.)) ) {
 			rho = Moulton(df, kernC)
-			/* run RD local polinomial regression */
-			// Suppress warnings about too few observations 
-			r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
 		}
 		else {
 			rho = J(cols(res)^2,1,0)
-			/* run RD local polinomial regression */
-			// Suppress warnings about too few observations 
-			r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j)
+			
 		}
-		
+
+		/* run RD local polinomial regression */
+		// Suppress warnings about too few observations 
+		r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
+	
 		wp = select(r1.wgt,r1.p:==1)
 		wm = select(r1.wgt,r1.m:==1)
 		XX = select(df.X,r1.kw:>0)
