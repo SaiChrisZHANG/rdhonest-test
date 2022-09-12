@@ -582,6 +582,11 @@ program Display
 		di `C1' as text %21s "Treatment variable: " _continue
 		DisplayVar `e(treat)'
 	}
+
+	if (`cluster_ind'){
+		di `C1' as text %21s "Clustered by: " _continue
+		DisplayVar `e(cluster)'
+	}
 	
 	if ("`e(savewgtest)'"!="NA"){
 		di
@@ -773,6 +778,7 @@ mata:
 			output.w = w
 			output.eo = 0
 			output.wgt = J(rows(X),1,0)
+			output.res = J(rows(Y),1,0)
 			output.p = p
 			output.m = m
 		}
@@ -848,7 +854,7 @@ mata:
 
 	class RDLPregOutput scalar RDLPreg(class RDData scalar df, real scalar h,
 		| string kernel, real scalar order, string se_method,
-			real scalar no_warning, real scalar j) {
+			real scalar no_warning, real scalar j, real vector rho) {
 
 		/* check for errors */
 		if (h <= 0) _error("Non-positive bandwidth h")
@@ -863,7 +869,6 @@ mata:
 		/* variable declarations */
 		real scalar plugin /* to be implemented later */
 		real matrix Y, X, w, sigma2, Xm, Xp, weight cluster
-		real vector rho
 		
 		class RDLPregOutput scalar output
 		class LPRegOutput scalar r1
@@ -1268,6 +1273,7 @@ mata:
 	struct RDResults {
 		real scalar estimate, fs, leverage
 		real scalar bias, sd, lower, upper, hl, eo, h, naive
+		real vector rho
 	}
 
 	// 7.1 NPRDHonest_fit
@@ -1295,9 +1301,10 @@ mata:
 			r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
 		}
 		else {
+			rho = J(cols(res)^2,1,0)
 			/* run RD local polinomial regression */
 			// Suppress warnings about too few observations 
-			r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
+			r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j)
 		}
 		
 		wp = select(r1.wgt,r1.p:==1)
@@ -1340,6 +1347,7 @@ mata:
 		results.eo = r1.eo
 		results.estimate = r1.estimate
 		results.fs = r1.fs 
+		results.rho = rho
 
 		return(results)
 	}
