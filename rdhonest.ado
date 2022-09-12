@@ -868,7 +868,7 @@ mata:
 
 		/* variable declarations */
 		real scalar plugin /* to be implemented later */
-		real matrix Y, X, w, sigma2, Xm, Xp, weight cluster
+		real matrix Y, X, w, sigma2, Xm, Xp, weight, cluster
 		
 		class RDLPregOutput scalar output
 		class LPRegOutput scalar r1
