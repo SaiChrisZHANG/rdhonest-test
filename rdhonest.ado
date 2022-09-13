@@ -1169,6 +1169,7 @@ mata:
 		Xp = select(df.X,df.X:>=0) ; Xm = select(df.X,df.X:<0)
 		printf("\n RDPrelimVar call RDPrelimEst \n")
 		r1 = RDPrelimEst(df, kernC, se_initial)
+		printf("\n RDPrelimVar call RDPrelimEst done \n")
 					 
 		if (strpos(se_initial,"Silverman") > 0) {	
 			if (cols(df.Y) == 1) {
