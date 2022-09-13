@@ -629,6 +629,7 @@ mata:
 		/* variables */
 		real matrix X,Y,sigma2
 		real vector cluster, weight, m, p, ID
+		real vector rho
 		real scalar cutoff
 		string rdclass
 
@@ -637,7 +638,7 @@ mata:
 	}
 
 	void RDData::setup(real vector ID, real matrix X, real matrix Y, real scalar c, ///
-		real matrix sigma2, real vector weight, real vector cluster, string rdclass) {
+		real matrix sigma2, real vector weight, real vector cluster, real vector rho, string rdclass) {
 
 		real matrix s
 
@@ -667,16 +668,18 @@ mata:
 
 		/* class */
 		this.rdclass = rdclass 
+
+		this.rho = rho
 	}
 
 	class RDData scalar RDDataPrep(real vector ID, real matrix X, real matrix Y, real scalar c , ///
 								   real matrix sigma2, real vector weight, ///
-								   real vector cluster, string rdclass) {
+								   real vector cluster, real vector rho, string rdclass) {
 		
 		/* constructs df */	
 		class RDData scalar df  // create an instance of RDData
 		
-		df.setup(ID,X,Y,c,sigma2,weight,cluster,rdclass)
+		df.setup(ID,X,Y,c,sigma2,weight,cluster,rho,rdclass)
 	  
 		return(df)
 	}
@@ -858,7 +861,7 @@ mata:
 
 	class RDLPregOutput scalar RDLPreg(class RDData scalar df, real scalar h,
 		| string kernel, real scalar order, string se_method,
-			real scalar no_warning, real scalar j, real vector rho) {
+			real scalar no_warning, real scalar j) {
 
 		/* check for errors */
 		if (h <= 0) _error("Non-positive bandwidth h")
@@ -873,9 +876,13 @@ mata:
 		/* variable declarations */
 		real scalar plugin /* to be implemented later */
 		real matrix Y, X, w, sigma2, Xm, Xp, weight, cluster
+		real vector rho
 		
 		class RDLPregOutput scalar output
 		class LPRegOutput scalar r1
+
+		/* set rho */
+		rho = df.rho
 
 		/* set kernel weights */
 		w = (h <= 0 ? (0 :* df.X) : (EqKernWeight(df.X:/h,kernel,0,0)):*df.weight)
@@ -1096,7 +1103,7 @@ mata:
 	// 5.1 build preliminary variance estimation
 
 	class RDPrelimVarOutput{
-		real vector p , m /* below and above indicator */
+		real vector p , m, moul /* below and above indicator */
 		real matrix res, sigma2 /* residuals */
 	}
 
@@ -1107,6 +1114,8 @@ mata:
 		class RDPrelimVarOutput scalar output
 		real scalar h1, hmin 
 		class RDData scalar drf 
+		real matrix clu_setup
+		real vector moul
 
 		/* concatenate Xm and Xp and compute "rule of thumb" bandwidth */
 		X = df.X
@@ -1145,11 +1154,17 @@ mata:
 			_error("Unknown method for estimating initial variance.")
 		}
 
+		if ( max((df.cluster:!=.)) ){
+			clu_setup = panelsetup( select(df.cluster,(r1.res[,1]:!=.)), 1)
+			moul = moulton_est(select(r1.res,(r1.res[,1]:!=.)), clu_setup)
+		}
+
 		/* output */
 		output.p = r1.p
 		output.m = r1.m
 		output.res = r1.res
 		output.sigma2 = r1.sigma2
+		output.moul = moul
 
 		return(output)
 	}
@@ -1157,6 +1172,7 @@ mata:
 	class RDData scalar RDPrelimVar(class RDData scalar df, real matrix kernC,| string se_initial) {
 		
 		real matrix X, Xp, Xm
+		real vector moul
 		real scalar lm, lp, varm, varp
 		class RDPrelimVarOutput scalar r1
 		
@@ -1176,10 +1192,14 @@ mata:
 				/* variance adjustment on either side */
 				lp = sum(r1.p)
 				lm = sum(r1.m)
-				
+				printf("\n lp,lm done \n")
+				printf("\n lp is %4.0g \n", lp)
+				printf("\n lm is %4.0g \n", lm)
 				varp = sum(r1.sigma2:*r1.p)*1/(lp-1)
 				varm = sum(r1.sigma2:*r1.m)*1/(lm-1)
-				
+				printf("\n varp,varm done \n")
+				printf("\n varp is %4.0g \n", varp)
+				printf("\n varm is %4.0g \n", varm)
 				df.sigma2 = (df.X:<0):*varm + (df.X:>=0):*varp
 				printf("\n RDPrelimVar done for Silverman \n")
 			}
@@ -1193,6 +1213,8 @@ mata:
 
 			df.sigma2 = (df.X:<0):*J(rows(df.X),1,varm) + (df.X:>=0):*J(rows(df.X),1,varp)	
 		}
+
+		df.rho = r1.moul
 
 		return(df)
 	}
@@ -1215,20 +1237,6 @@ mata:
 		}
 
 		return (moul)
-	}
-
-	real vector Moulton(class RDData scalar df, real matrix kernC){
-		class RDPrelimVarOutput scalar r1
-		real matrix clu_setup
-		real vector moul
-		printf("\n run RDPrelimEst \n")
-		r1 = RDPrelimEst(df, kernC, "IKEHW")
-		printf("\n RDPrelimEst done, panel set up \n")
-		clu_setup = panelsetup( select(df.cluster,(r1.res[,1]:!=.)), 1)
-		
-		moul = moulton_est(select(r1.res,(r1.res[,1]:!=.)), clu_setup)
-
-		return(moul)
 	}
 
 	// 6. compute optimal h=====================================
@@ -1301,7 +1309,6 @@ mata:
 	struct RDResults {
 		real scalar estimate, fs, leverage
 		real scalar bias, sd, lower, upper, hl, eo, h, naive
-		real vector rho
 	}
 
 	// 7.1 NPRDHonest_fit
@@ -1311,7 +1318,7 @@ mata:
 
 		class RDLPregOutput scalar r1
 		real scalar h, z
-		real vector wp, wm, M, rho
+		real vector wp, wm, M
 		real matrix XX, XXp, XXm 
 		struct RDResults scalar results
 
@@ -1322,21 +1329,11 @@ mata:
 			h = RDOptBW_fit(df, opt, kernC)
 		}
 
-		printf("\n NPRDHonest_fit rho calculating \n")
-		if ( max((df.cluster:!=.)) ) {
-			rho = Moulton(df, kernC)
-		}
-		else {
-			rho = J(cols(df.Y)^2,1,0)
-			
-		}
-		printf("\n NPRDHonest_fit rho calculated \n")
-
 		/* run RD local polinomial regression */
 		// Suppress warnings about too few observations 
 
 		printf("\n NPRDHonest_fit running RDLPreg \n")
-		r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j, rho)
+		r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j)
 		printf("\n NPRDHonest_fit RDLPreg done \n")
 
 		wp = select(r1.wgt,r1.p:==1)
