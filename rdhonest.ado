@@ -1039,8 +1039,9 @@ mata:
 		cons = (s[9]/(s[6]^2))^(1/5)
 		
 		/* run prelim var which asssumes homoskedasticity */
-		printf("\n run Silverman RDPrelimVar \n")
+		printf("\n run Silverman RDPrelimVar for IKBW_fit \n")
 		df = RDPrelimVar(df, kernC, "Silverman")
+		printf("\n Silverman RDPrelimVar done for IKBW_fit \n")
 		h1 = 1.84 * sqrt(variance(X))/(N^(1/5))
 		f0 = sum(abs(X) :<= h1)/(2 * N * h1)	
 		varm = select(df.sigma2,df.m:==1)[1]; varp = select(df.sigma2,df.p:==1)[1]
@@ -1179,6 +1180,7 @@ mata:
 				varm = sum(r1.sigma2:*r1.m)*1/(lm-1)
 				
 				df.sigma2 = (df.X:<0):*varm + (df.X:>=0):*varp
+				printf("\n RDPrelimVar done for Silverman \n")
 			}
 		}
 		else if (strpos(se_initial,"IKEHW") > 0) {
