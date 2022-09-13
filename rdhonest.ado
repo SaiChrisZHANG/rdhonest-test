@@ -1212,8 +1212,9 @@ mata:
 		class RDPrelimVarOutput scalar r1
 		real matrix clu_setup
 		real vector moul
-
+		printf("\n run RDPrelimEst \n")
 		r1 = RDPrelimEst(df, kernC, "IKEHW")
+		printf("\n RDPrelimEst done, panel set up \n")
 		clu_setup = panelsetup( select(df.cluster,(r1.res[,1]:!=.)), 1)
 		
 		moul = moulton_est(select(r1.res,(r1.res[,1]:!=.)), clu_setup)
