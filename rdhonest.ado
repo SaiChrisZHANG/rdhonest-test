@@ -1142,7 +1142,7 @@ mata:
 		output.p = r1.p
 		output.m = r1.m
 		output.res = r1.res
-		output.sigma = r1.sigma
+		output.sigma2 = r1.sigma2
 
 		return(output)
 	}
