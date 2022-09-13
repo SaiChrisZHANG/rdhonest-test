@@ -327,7 +327,7 @@ program Estimate, eclass byable(recall) sortpreserve
 	local title "Honest inference: {res:`=upper("`e(rd)'")'} Regression Discontinuity"
 	eret local title `title'
 
-	Display, `noparameter' fRD(`fRD') opt_bw(`bw_opted') opt_m(`m_opted')
+	Display, `noparameter' fRD(`fRD') opt_bw(`bw_opted') opt_m(`m_opted') cluster_ind(`cluster_ind')
 end
 
 
@@ -479,7 +479,7 @@ end
 
 program Display
 
-	syntax , [NOPARAMeter fRD(real 0) opt_bw(real 0) opt_m(real 0) *]
+	syntax , [NOPARAMeter fRD(real 0) opt_bw(real 0) opt_m(real 0) cluster_ind(real 0) *]
 	
 	local C1 "_col(2)"
 	local C2 "_col(16)"
@@ -587,7 +587,7 @@ program Display
 		DisplayVar `e(treat)'
 	}
 
-	if (`cluster_ind'){
+	if (`cluster_ind') {
 		di `C1' as text %21s "Clustered by: " _continue
 		DisplayVar `e(cluster)'
 	}
