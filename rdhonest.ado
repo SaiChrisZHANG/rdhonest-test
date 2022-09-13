@@ -1375,8 +1375,7 @@ mata:
 		results.h = h
 		results.eo = r1.eo
 		results.estimate = r1.estimate
-		results.fs = r1.fs 
-		results.rho = rho
+		results.fs = r1.fs
 
 		return(results)
 	}
