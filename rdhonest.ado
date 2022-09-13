@@ -193,7 +193,6 @@ program Estimate, eclass byable(recall) sortpreserve
 	* start mata
 	set matastrict on
 	mata{
-		mata set matalnum on
 		if (`fRD') Y = st_data(.,("`depvar'","`treat'"));
 		if (`sRD') Y = st_data(.,("`depvar'"));
 		X = st_data(.,("`runvar'"))	
@@ -1096,7 +1095,7 @@ mata:
 
 	class RDPrelimVarOutput{
 		real vector p , m /* below and above indicator */
-		real matrix res /* residuals */
+		real matrix res, sigma2 /* residuals */
 	}
 
 	class RDPrelimVarOutput scalar RDPrelimEst(class RDData scalar df, real matrix kernC, string se_initial) {
@@ -1143,6 +1142,7 @@ mata:
 		output.p = r1.p
 		output.m = r1.m
 		output.res = r1.res
+		output.sigma = r1.sigma
 
 		return(output)
 	}
