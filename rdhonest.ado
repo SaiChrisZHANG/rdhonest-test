@@ -1039,6 +1039,7 @@ mata:
 		cons = (s[9]/(s[6]^2))^(1/5)
 		
 		/* run prelim var which asssumes homoskedasticity */
+		printf("\n run Silverman RDPrelimVar \n")
 		df = RDPrelimVar(df, kernC, "Silverman")
 		h1 = 1.84 * sqrt(variance(X))/(N^(1/5))
 		f0 = sum(abs(X) :<= h1)/(2 * N * h1)	
@@ -1124,15 +1125,20 @@ mata:
 					 
 		if (strpos(se_initial,"Silverman") > 0) {	
 			if (cols(df.Y) == 1) {
+				printf("\n run RDLPreg \n")
 				r1 = RDLPreg(df,h1,"uni",0,"EHW")
+				printf("\n done RDLPreg \n")
 			} 
 			else {	
 				_error("This method for preliminary variance estimation is not supported.")
 			}
 		}
 		else if (strpos(se_initial,"IKEHW") > 0) {
-			h1 = IKBW_fit(drf, kernC)	
+			printf("\n run IKBW_fit \n")
+			h1 = IKBW_fit(drf, kernC)
+			printf("\n IKBW_fit done, run RDLPreg \n")	
 			r1 = RDLPreg(df,max((h1,hmin)),"tri",1,"EHW")
+			printf("\n done RDLPreg \n")
 		}
 		else {
 			_error("Unknown method for estimating initial variance.")
@@ -1160,7 +1166,7 @@ mata:
 		X = df.X
 		
 		Xp = select(df.X,df.X:>=0) ; Xm = select(df.X,df.X:<0)
-
+		printf("\n RDPrelimVar call RDPrelimEst \n")
 		r1 = RDPrelimEst(df, kernC, se_initial)
 					 
 		if (strpos(se_initial,"Silverman") > 0) {	
