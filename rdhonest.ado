@@ -479,7 +479,7 @@ end
 
 program Display
 
-	syntax , [NOPARAMeter fRD(real 0) opt_bw(real 0) opt_m(real 0) cluster_ind(real 0) *]
+	syntax , [NOPARAMeter fRD(real 0) opt_bw(real 0) opt_m(real 0) cluster_ind(real 0)*]
 	
 	local C1 "_col(2)"
 	local C2 "_col(16)"
@@ -587,7 +587,7 @@ program Display
 		DisplayVar `e(treat)'
 	}
 
-	if (`cluster_ind') {
+	if (`cluster_ind'){
 		di `C1' as text %21s "Clustered by: " _continue
 		DisplayVar `e(cluster)'
 	}
@@ -799,7 +799,7 @@ mata:
 
 			/* Robust variance-based formula */
 			// supplied_var: use use-supplied squared residuals to compute EHW variance 
-			if ( max((df.cluster:==.)) ) {
+			if ( max((cluster:==.)) ) {
 				if(strpos(se_method,"supplied_var") > 0) {
 					var = colsum(wgt:^2:*sigma2)
 				}
@@ -1213,7 +1213,7 @@ mata:
 		real matrix clu_setup
 		real vector moul
 
-		r1 = RDPrelimEst(df, KernC, "IKEHW")
+		r1 = RDPrelimEst(df, kernC, "IKEHW")
 		clu_setup = panelsetup( select(df.cluster,(r1.res[,1]:!=.)), 1)
 		
 		moul = moulton_est(select(r1.res,(r1.res[,1]:!=.)), clu_setup)
@@ -1317,7 +1317,7 @@ mata:
 			rho = Moulton(df, kernC)
 		}
 		else {
-			rho = J(cols(res)^2,1,0)
+			rho = J(cols(df.Y)^2,1,0)
 			
 		}
 		printf("\n NPRDHonest_fit rho calculated \n")
