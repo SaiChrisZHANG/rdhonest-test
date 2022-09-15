@@ -210,6 +210,7 @@ program Estimate, eclass byable(recall) sortpreserve
 		if (!`cluster_ind') cluster = J(rows(Y),1,.);
 		if (`weight_ind') weight = st_data(.,("`weight'")); 
 		if (!`weight_ind') weight = J(rows(Y),1,1);
+		rho = J(1,cols(Y)^2,.);
 
 		// select sample
 		id = select(ID,sample:==1);
@@ -221,7 +222,7 @@ program Estimate, eclass byable(recall) sortpreserve
 		weight = select(weight,sample:==1)
 	  	printf("\n data prep start \n")
 		// initialize data frame and map Y and X in
-		df = RDDataPrep(id,X,Y,`c',sigma2,weight,cluster,rdclass)
+		df = RDDataPrep(id,X,Y,`c',sigma2,weight,cluster,rho,rdclass)
 		printf("\n data prep done \n")
 
 		// initialize options
@@ -745,7 +746,8 @@ mata:
 
 		real matrix wgt  /* OLS weight on Y_i that gives theta */
 
-		real matrix res /* residuals */				  
+		real matrix res /* residuals */		
+		real matrix clu_setup /*clustering set up*/		  
 	}
 
 	class LPRegOutput scalar LPReg (real matrix X, real matrix Y, real matrix sigma2, 
@@ -758,6 +760,7 @@ mata:
 		/* weight: obs weights */ 
 		/* wt: OLS weights give theta */
 		/* W: kern weights plus obs weights */
+		/* cluster_res: cluster selected by non-missing residual */
 		real vector wgt, w, wgt_unif
 		real vector p, m
 		
@@ -788,6 +791,7 @@ mata:
 			output.res = J(rows(Y),1,0)
 			output.p = p
 			output.m = m
+			output.clu_setup = panelsetup(cluster,1)
 		}
 		else{
 			wgt = ((invsym(Gamma) * (w :* R)')[1,.])'
@@ -798,7 +802,7 @@ mata:
 			/* estimates from using OLS weights */
 			/* squared residuals allowing for Y being multi-variates */
 			beta = (invsym(Gamma) * (w :* R)' )* Y
-			res = (Y - R*beta) 	
+			res = (Y - R*beta)
 
 			/* Robust variance-based formula */
 			// supplied_var: use use-supplied squared residuals to compute EHW variance 
@@ -843,6 +847,7 @@ mata:
 			output.res = res
 			output.p = p
 			output.m = m
+			output.clu_setup = clu_setup
 		}
 		
 		//printf("var is %9.4f ",output.var)
@@ -923,6 +928,7 @@ mata:
 		output.var = r1.var
 		output.wgt = r1.wgt
 		output.res = r1.res
+		output.clu_setup = r1.clu_setup
 		
 		if (df.rdclass == "frd") {	
 			output.fs = r1.theta[2]
@@ -1138,6 +1144,7 @@ mata:
 				printf("\n run RDLPreg \n")
 				r1 = RDLPreg(df,h1,"uni",0,"EHW")
 				printf("\n done RDLPreg \n")
+				printf("\n rows of r1: %g \n ", rows(r1.res))
 			} 
 			else {	
 				_error("This method for preliminary variance estimation is not supported.")
@@ -1149,14 +1156,20 @@ mata:
 			printf("\n IKBW_fit done, run RDLPreg \n")	
 			r1 = RDLPreg(df,max((h1,hmin)),"tri",1,"EHW")
 			printf("\n done RDLPreg \n")
+			printf("\n rows of r1: %g \n ", rows(r1.res))
 		}
 		else {
 			_error("Unknown method for estimating initial variance.")
 		}
 
 		if ( max((df.cluster:!=.)) ){
-			clu_setup = panelsetup( select(df.cluster,(r1.res[,1]:!=.)), 1)
-			moul = moulton_est(select(r1.res,(r1.res[,1]:!=.)), clu_setup)
+			printf("\n print clu_setup \n")
+r1.clu_setup[(1::2),.]
+			printf("\n print res \n")
+r1.res[(1::2),.]
+			moul = moulton_est(r1.res, r1.clu_setup)
+			printf("\n print rho \n")
+moul
 		}
 
 		/* output */
@@ -1192,14 +1205,8 @@ mata:
 				/* variance adjustment on either side */
 				lp = sum(r1.p)
 				lm = sum(r1.m)
-				printf("\n lp,lm done \n")
-				printf("\n lp is %4.0g \n", lp)
-				printf("\n lm is %4.0g \n", lm)
 				varp = sum(r1.sigma2:*r1.p)*1/(lp-1)
 				varm = sum(r1.sigma2:*r1.m)*1/(lm-1)
-				printf("\n varp,varm done \n")
-				printf("\n varp is %4.0g \n", varp)
-				printf("\n varm is %4.0g \n", varm)
 				df.sigma2 = (df.X:<0):*varm + (df.X:>=0):*varp
 				printf("\n RDPrelimVar done for Silverman \n")
 			}
@@ -1213,8 +1220,9 @@ mata:
 
 			df.sigma2 = (df.X:<0):*J(rows(df.X),1,varm) + (df.X:>=0):*J(rows(df.X),1,varp)	
 		}
-
+		printf("\n assign rho \n")
 		df.rho = r1.moul
+		printf("\n rho assigned \n")
 
 		return(df)
 	}
@@ -1236,7 +1244,7 @@ mata:
 			moul = J(cols(res)^2,1,0)
 		}
 
-		return (moul)
+		return (moul')
 	}
 
 	// 6. compute optimal h=====================================
