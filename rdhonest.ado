@@ -831,6 +831,8 @@ mata:
 				else {
 					Vaug = panelsum(wgt:*res, clu_setup)
 					var = vec( cross(Vaug,Vaug) )'
+					printf("\n var calculated \n")
+var
 				}
 			}
 			
@@ -929,7 +931,13 @@ mata:
 		output.wgt = r1.wgt
 		output.res = r1.res
 		output.clu_setup = r1.clu_setup
-		
+		printf("\n print sigma 2 \n")
+output.sigma2
+		printf("\n print p")
+output.p
+		printf("\n print m")
+output.m
+
 		if (df.rdclass == "frd") {	
 			output.fs = r1.theta[2]
 			output.estimate = r1.theta[1]/r1.theta[2]
@@ -1141,10 +1149,10 @@ mata:
 					 
 		if (strpos(se_initial,"Silverman") > 0) {	
 			if (cols(df.Y) == 1) {
-				printf("\n run RDLPreg \n")
 				r1 = RDLPreg(df,h1,"uni",0,"EHW")
-				printf("\n done RDLPreg \n")
-				printf("\n rows of r1: %g \n ", rows(r1.res))
+				printf("\n rows of r1 sigma2: %g \n ", rows(r1.sigma2))
+				printf("\n rows of r1 lp: %g \n ", rows(r1.p))
+				printf("\n rows of r1 lm: %g \n ", rows(r1.m))
 			} 
 			else {	
 				_error("This method for preliminary variance estimation is not supported.")
@@ -1205,20 +1213,32 @@ moul
 				/* variance adjustment on either side */
 				lp = sum(r1.p)
 				lm = sum(r1.m)
+
+				printf("\n impute varp varm \n")
+				printf("\n sigma2")
 				varp = sum(r1.sigma2:*r1.p)*1/(lp-1)
 				varm = sum(r1.sigma2:*r1.m)*1/(lm-1)
+				printf("\n done \n")
+
+				printf("\n impute sigma2 \n")
 				df.sigma2 = (df.X:<0):*varm + (df.X:>=0):*varp
 				printf("\n RDPrelimVar done for Silverman \n")
 			}
 		}
 		else if (strpos(se_initial,"IKEHW") > 0) {
+			printf("\n impute lp lm \n")
 			lp = sum(r1.p)
 			lm = sum(r1.m)
+			printf("\n done \n")
 			
+			printf("\n impute varp varm \n")
 			varp = colsum(r1.sigma2:*r1.p)/lp
 			varm = colsum(r1.sigma2:*r1.m)/lm
+			printf("\n done \n")
 
+			printf("\n impute sigma2 \n")
 			df.sigma2 = (df.X:<0):*J(rows(df.X),1,varm) + (df.X:>=0):*J(rows(df.X),1,varp)	
+			printf("\n done \n")
 		}
 		printf("\n assign rho \n")
 		df.rho = r1.moul
