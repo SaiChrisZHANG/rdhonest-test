@@ -809,30 +809,35 @@ mata:
 			if ( max((cluster:==.)) ) {
 				if(strpos(se_method,"supplied_var") > 0) {
 					var = colsum(wgt:^2:*sigma2)
+					output.sigma2 = sigma2
 				}
 
 				if(strpos(se_method,"EHW") > 0 | strpos(se_method,"ehw") > 0) {
 					hsigma2=res[.,(J(1, cols(res), (1..cols(res))))]:*
 					res[.,( vec(J(cols(res),1, (1..cols(res))))')]
 					var = colsum(wgt:^2:*hsigma2)
+					output.sigma2 = hsigma2
 				}
 
 				if(strpos(se_method,"NN") > 0 | strpos(se_method,"nn") > 0 ) {
 					nsigma2 = sigmann(X,Y,j,weight)
 					var = colsum(wgt:^2:*nsigma2)
+					output.sigma2 = nsigma2
 				}
 			}
 			else {
 				clu_setup = panelsetup(cluster,1)
 				if(strpos(se_method,"supplied_var") > 0) {
+					output.sigma2 = sigma2
 					var = colsum(wgt:^2:*sigma2) :+ rho*( sum(panelsum(wgt,clu_setup):^2) - sum(wgt:^2) )
 				}
 				
 				else {
+					hsigma2=res[.,(J(1, cols(res), (1..cols(res))))]:*
+					res[.,( vec(J(cols(res),1, (1..cols(res))))')]
+					output.sigma2 = hsigma2
 					Vaug = panelsum(wgt:*res, clu_setup)
 					var = vec( cross(Vaug,Vaug) )'
-					printf("\n var calculated \n")
-var
 				}
 			}
 			
@@ -841,7 +846,6 @@ var
 
 			/* return output */
 			output.theta = beta[1,.]
-			output.sigma2 = hsigma2
 			output.var = var
 			output.w = w
 			output.eo = length(X)*sum(wgt_unif:^2)/sum(wgt:^2) 
@@ -931,12 +935,6 @@ var
 		output.wgt = r1.wgt
 		output.res = r1.res
 		output.clu_setup = r1.clu_setup
-		printf("\n print sigma 2 \n")
-output.sigma2
-		printf("\n print p")
-output.p
-		printf("\n print m")
-output.m
 
 		if (df.rdclass == "frd") {	
 			output.fs = r1.theta[2]
