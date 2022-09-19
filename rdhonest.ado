@@ -203,7 +203,6 @@ program Estimate, eclass byable(recall) sortpreserve
 
 		rdclass = (`sRD'>0 ? "srd":"frd")
 		
-		printf("\n impute missing \n")
 		if (`prevar_ind') sigma2 = st_data(.,("`pvariance'"));
 		if (!`prevar_ind') sigma2 = J(rows(Y),cols(Y)^2,.);
 		if (`cluster_ind') cluster = st_data(.,("`cluster'"));
@@ -220,10 +219,9 @@ program Estimate, eclass byable(recall) sortpreserve
 		sigma2 = select(sigma2,sample:==1)
 		cluster = select(cluster,sample:==1)
 		weight = select(weight,sample:==1)
-	  	printf("\n data prep start \n")
+
 		// initialize data frame and map Y and X in
 		df = RDDataPrep(id,X,Y,`c',sigma2,weight,cluster,rho,rdclass)
-		printf("\n data prep done \n")
 
 		// initialize options
 		m=(`=subinstr("`m'"," ",",",.)')
@@ -253,7 +251,6 @@ program Estimate, eclass byable(recall) sortpreserve
 							t0,
 							nolog)  
 
-		printf("\n option prep done \n")
 
 		// return
 		ret = RDResults()
@@ -1058,9 +1055,7 @@ mata:
 		cons = (s[9]/(s[6]^2))^(1/5)
 		
 		/* run prelim var which asssumes homoskedasticity */
-		printf("\n run Silverman RDPrelimVar for IKBW_fit \n")
 		df = RDPrelimVar(df, kernC, "Silverman")
-		printf("\n Silverman RDPrelimVar done for IKBW_fit \n")
 		h1 = 1.84 * sqrt(variance(X))/(N^(1/5))
 		f0 = sum(abs(X) :<= h1)/(2 * N * h1)	
 		varm = select(df.sigma2,df.m:==1)[1]; varp = select(df.sigma2,df.p:==1)[1]
@@ -1148,34 +1143,21 @@ mata:
 		if (strpos(se_initial,"Silverman") > 0) {	
 			if (cols(df.Y) == 1) {
 				r1 = RDLPreg(df,h1,"uni",0,"EHW")
-				printf("\n rows of r1 sigma2: %g \n ", rows(r1.sigma2))
-				printf("\n rows of r1 lp: %g \n ", rows(r1.p))
-				printf("\n rows of r1 lm: %g \n ", rows(r1.m))
 			} 
 			else {	
 				_error("This method for preliminary variance estimation is not supported.")
 			}
 		}
 		else if (strpos(se_initial,"IKEHW") > 0) {
-			printf("\n run IKBW_fit \n")
 			h1 = IKBW_fit(drf, kernC)
-			printf("\n IKBW_fit done, run RDLPreg \n")	
 			r1 = RDLPreg(df,max((h1,hmin)),"tri",1,"EHW")
-			printf("\n done RDLPreg \n")
-			printf("\n rows of r1: %g \n ", rows(r1.res))
 		}
 		else {
 			_error("Unknown method for estimating initial variance.")
 		}
 
 		if ( max((df.cluster:!=.)) ){
-			printf("\n print clu_setup \n")
-r1.clu_setup[(1::2),.]
-			printf("\n print res \n")
-r1.res[(1::2),.]
 			moul = moulton_est(r1.res, r1.clu_setup)
-			printf("\n print rho \n")
-moul
 		}
 
 		/* output */
@@ -1202,9 +1184,7 @@ moul
 		X = df.X
 		
 		Xp = select(df.X,df.X:>=0) ; Xm = select(df.X,df.X:<0)
-		printf("\n RDPrelimVar call RDPrelimEst \n")
 		r1 = RDPrelimEst(df, kernC, se_initial)
-		printf("\n RDPrelimVar call RDPrelimEst done \n")
 					 
 		if (strpos(se_initial,"Silverman") > 0) {	
 			if (cols(df.Y) == 1) {
@@ -1212,36 +1192,23 @@ moul
 				lp = sum(r1.p)
 				lm = sum(r1.m)
 
-				printf("\n impute varp varm \n")
-				printf("\n sigma2")
 				varp = sum(r1.sigma2:*r1.p)*1/(lp-1)
 				varm = sum(r1.sigma2:*r1.m)*1/(lm-1)
-				printf("\n done \n")
-
-				printf("\n impute sigma2 \n")
+				
 				df.sigma2 = (df.X:<0):*varm + (df.X:>=0):*varp
-				printf("\n RDPrelimVar done for Silverman \n")
 			}
 		}
 		else if (strpos(se_initial,"IKEHW") > 0) {
-			printf("\n impute lp lm \n")
 			lp = sum(r1.p)
 			lm = sum(r1.m)
-			printf("\n done \n")
-			
-			printf("\n impute varp varm \n")
+
 			varp = colsum(r1.sigma2:*r1.p)/lp
 			varm = colsum(r1.sigma2:*r1.m)/lm
-			printf("\n done \n")
-
-			printf("\n impute sigma2 \n")
+			
 			df.sigma2 = (df.X:<0):*J(rows(df.X),1,varm) + (df.X:>=0):*J(rows(df.X),1,varp)	
-			printf("\n done \n")
 		}
-		printf("\n assign rho \n")
 		df.rho = r1.moul
-		printf("\n rho assigned \n")
-
+		
 		return(df)
 	}
 
@@ -1358,9 +1325,7 @@ moul
 		/* run RD local polinomial regression */
 		// Suppress warnings about too few observations 
 
-		printf("\n NPRDHonest_fit running RDLPreg \n")
 		r1 = RDLPreg(df, h, opt.kernel, opt.order, opt.se_method, 1, opt.j)
-		printf("\n NPRDHonest_fit RDLPreg done \n")
 
 		wp = select(r1.wgt,r1.p:==1)
 		wm = select(r1.wgt,r1.m:==1)
@@ -1416,8 +1381,6 @@ moul
 		struct RDResults scalar results
 		class RDLPregOutput scalar regoutput 
 		real matrix kw, wgt, tempID, Sample, est_w
-		
-		printf("\n check1 \n")
 
 		/* initial se estimate */
 		if ( max((df.sigma2:==.))
@@ -1433,12 +1396,8 @@ moul
 		opt.m = MROT_fit(df.X,df.Y)	
 		}
 		
-		printf("\n check2 \n")
-
 		/* optimal bandwidth */
 		results =  NPRDHonest_fit(df, opt,kernC, 0)
-
-		printf("\n check3 \n")
 
 		/*** numerical scalars ***/ 
 		st_numscalar("estimate",results.estimate)
