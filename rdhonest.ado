@@ -51,7 +51,7 @@ program Estimate, eclass byable(recall) sortpreserve
 	  [,c(real 0) /// cutoff, default: 0
 		m(numlist >0 min=1) /// Bound on second derivative of the conditional mean function, default: ROT calculation (add ">0" to allow only positive inputs)
 		kernel(string) /// kernel function used, choose from triangular, uniform, optimal, default: triangular
-		OPT_CRITerion(string) /// optimality criterion, choose from MSE, FLCI, OCI, default: MSE
+		opt_criterion(string) /// optimality criterion, choose from MSE, FLCI, OCI, default: MSE
 		h(real 0) /// bandwidth, default: optimal level calculated following opt_criterion
 		se_method(string) /// choose from "NN", "EHW", if not specified but PVARiance is specified, use user-supplied variance, ) 
 		alpha(real 0.05) /// confidence level, default: 0.05
