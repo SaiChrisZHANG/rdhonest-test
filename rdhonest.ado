@@ -40,14 +40,14 @@ program Estimate, eclass byable(recall) sortpreserve
 
 	* parsing ===================================
 	rdparse `0'
-	
+
 	local depvar `s(depvar)'
 	local runvar `s(runvar)'
 	local covar `s(covar)'
 	local treat `s(treat)'
 	local 0 `s(zero)'
 	
-	syntax [if] [in] /// 
+	syntax [if] [in] [aw fw pw iw/] /// 
 	  [,c(real 0) /// cutoff, default: 0
 		m(numlist >0 min=1) /// Bound on second derivative of the conditional mean function, default: ROT calculation (add ">0" to allow only positive inputs)
 		kernel(string) /// kernel function used, choose from triangular, uniform, optimal, default: triangular
@@ -61,14 +61,13 @@ program Estimate, eclass byable(recall) sortpreserve
 		/// pinf(integer 0) /// =1 if user wants to do inference at cutoff point instead of RD
 		PVARiance(varlist) /// 
 		CLuster(varlist) /// clustering variables 
-		Weight(varname) /// weighting variables
+		/// Weight(varname) /// weighting variables
 		SAVEWgtest(string) ///
 		NOPARAMeter /// not show paramaters used
 		ITERLog /// show iteration log
 	   ]
 
 	_get_diopts diopts, `options'
-
 	// class of regressions
 	local sRD `=("`treat'"=="")' // sharp RD
 	local fRD `=("`treat'"!="")' // fuzzy RD
@@ -88,10 +87,9 @@ program Estimate, eclass byable(recall) sortpreserve
 	local cluster_ind `="`cluster'" != ""'
 	
 	// Indicator: weights of obs provided, weight_ind=1
-	local weight_ind `="`weight'" != ""'	
-
+	// local weight_ind `="`weight'" != ""'	
 	marksample touse
-	markout `touse' `devpar' `covar' `runvar' `treat' `pvariance' `cluster' `weight', strok
+	markout `touse' `devpar' `covar' `runvar' `treat' `pvariance' `cluster', strok
 
 	set more off // set more off
 
@@ -118,6 +116,37 @@ program Estimate, eclass byable(recall) sortpreserve
 	// sort by cluster id for clustering
 	if (`cluster_ind') {
 		sort `cluster'
+	}
+
+	// extract weight information
+	if `"`exp'"' != "" {
+		local wgt `"[`weight' = `exp']"'
+		qui replace `touse' = 0 if missing(`exp')
+	}
+	di "get exp"
+	// generate weights and sample size that are suitable for use within Mata
+	tempvar normwt 
+	if `"`exp'"' != "" {
+		qui gen double `normwt' = `exp' if `touse'
+		if "`weight'" == "aweight" | "`weight'" == "pweight" {
+			summ `normwt' if `touse', mean
+			di as text "(sum of wgt is " %12.4e r(sum) ")"
+			qui replace `normwt' = r(N)*`normwt'/r(sum) if `touse'
+		}
+		///local wtexp `"[`weight' = `exp']"'
+		summ `normwt' if `touse', mean
+		if "`weight'" == "iweight" {
+			local normN = trunc(r(sum))
+		}
+		else {
+			local normN = r(sum)
+		}
+		markout `touse' `normwt'
+	}
+	else {
+		qui gen double `normwt' = 1 if `touse'
+		qui count if `touse'
+		local normN = r(N)
 	}
 
 	* input control =============================
@@ -207,8 +236,9 @@ program Estimate, eclass byable(recall) sortpreserve
 		if (!`prevar_ind') sigma2 = J(rows(Y),cols(Y)^2,.);
 		if (`cluster_ind') cluster = st_data(.,("`cluster'"));
 		if (!`cluster_ind') cluster = J(rows(Y),1,.);
-		if (`weight_ind') weight = st_data(.,("`weight'")); 
-		if (!`weight_ind') weight = J(rows(Y),1,1);
+		weight = st_data(.,("`normwt'"));
+		/// if (`weight_ind') weight = st_data(.,("`weight'")); 
+		/// if (!`weight_ind') weight = J(rows(Y),1,1);
 		rho = J(1,cols(Y)^2,.);
 
 		// select sample
