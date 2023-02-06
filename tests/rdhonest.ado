@@ -503,9 +503,9 @@ program Display
 	di "{hline 78}"
 	/* other estimation results: one-sided CIs, optimal h, effective observations */
 	di `C1' as text %2.0f `=(1-`e(alpha)')*100' "% One-sided Conf. intervals:" " (" ///
-			as res %-11.0g e(OCiL) as text ", Inf), " ///
 			as text "(-Inf, " ///
-			as res %11.0g e(OCiU) as text ")"	
+			as res %11.0g e(OCiU) as text ")" ///
+			as res %-11.0g e(OCiL) as text ", Inf), "
 	if (`fRD') {
 		di `C1' as text "First-stage estimate: " as res %-11.0g e(est_fs)
 	}
