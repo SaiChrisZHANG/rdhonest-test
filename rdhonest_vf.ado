@@ -89,7 +89,7 @@ program Estimate, eclass byable(recall) sortpreserve
 	// Indicator: weights of obs provided, weight_ind=1
 	// local weight_ind `="`weight'" != ""'	
 	marksample touse
-	markout `touse' `devpar' `covar' `runvar' `treat' `pvariance' `cluster', strok
+	markout `touse' `depvar' `covar' `runvar' `treat' `pvariance' `cluster', strok
 
 	set more off // set more off
 
